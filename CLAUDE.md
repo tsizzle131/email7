@@ -31,6 +31,21 @@ This repository uses Context7 MCP for project management and documentation:
 - Update these files as needed when working on features or making changes
 - Context7 helps maintain project context and task tracking across sessions
 
+## Deployment
+
+**Vercel Deployment Fixed:**
+- Fixed `rate-limiter-flexible` version issue (changed to `^2.4.2`)
+- Updated googleapis compatibility
+- Added serverless API structure in `/api` folder
+- Created `vercel.json` configuration
+- Removed problematic dependencies for serverless deployment
+
+**Environment Variables Needed:**
+- Supabase credentials (URL, keys)
+- OpenAI API key
+- Google Maps API key
+- Google OAuth credentials
+
 ## Current Permissions
 
 The repository has Claude Code permissions configured to allow Bash find commands and MCP server management via `.claude/settings.local.json`.

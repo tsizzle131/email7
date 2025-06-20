@@ -5,8 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/logs",
     "start": "node dist/index.js",
+    "vercel-build": "npm run build",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "scrape": "tsx src/scripts/scrape-businesses.ts",
@@ -16,17 +17,15 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.38.4",
     "express": "^4.18.2",
-    "googleapis": "^128.0.0",
+    "googleapis": "^127.0.0",
     "puppeteer": "^21.5.2",
     "cheerio": "^1.0.0-rc.12",
     "openai": "^4.20.1",
-    "nodemailer": "^6.9.7",
     "cors": "^2.8.5",
     "helmet": "^7.1.0",
-    "rate-limiter-flexible": "^3.0.8",
+    "rate-limiter-flexible": "^2.4.2",
     "validator": "^13.11.0",
     "dotenv": "^16.3.1",
-    "cron": "^3.1.6",
     "winston": "^3.11.0"
   },
   "devDependencies": {
@@ -35,7 +34,6 @@
     "@types/cors": "^2.8.17",
     "@types/validator": "^13.11.7",
     "@types/cheerio": "^0.22.35",
-    "@types/nodemailer": "^6.4.14",
     "typescript": "^5.2.2",
     "tsx": "^4.1.2",
     "jest": "^29.7.0",
@@ -45,6 +43,6 @@
     "@typescript-eslint/parser": "^6.11.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   }
 }

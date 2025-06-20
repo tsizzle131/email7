@@ -1,18 +1,26 @@
-node_modules
-dist
-.env
+# Dependencies
+node_modules/
+/frontend/node_modules/
 .DS_Store
-npm-debug.log
-/frontend/node_modules
-/frontend/dist
-/frontend/.env
-/frontend/.next
-/database/
-/src/
-/frontend/src/
-/frontend/src/app/
-/frontend/src/components/
-/frontend/src/lib/
-/frontend/src/styles/
-/frontend/public/
-/frontend/ 
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env*
+!/.env.example
+
+# Build output
+dist/
+/frontend/.next/
+/frontend/dist/
+/frontend/out/
+
+# Vercel
+.vercel/
+.vercelignore
+package-vercel.json 
