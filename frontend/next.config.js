@@ -12,9 +12,12 @@ const nextConfig = {
       },
     ]
   },
-  // For monorepo deployment, ensure static files work correctly
-  trailingSlash: false,
-  output: 'standalone'
+  // For static export to work with Vercel
+  output: 'export',
+  trailingSlash: true,
+  images: {
+    unoptimized: true
+  }
 }
 
 module.exports = nextConfig
