@@ -1,8 +1,13 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "@vercel/node@3.2.17"
+  "crons": [
+    {
+      "path": "/api/cron/follow-ups",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/process-campaigns",
+      "schedule": "0 */6 * * *"
     }
-  }
+  ]
 }
