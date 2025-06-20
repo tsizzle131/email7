@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel",
-    "build": "echo 'API-only project - no static build required'",
     "test": "echo 'Tests to be implemented'"
   },
   "dependencies": {
