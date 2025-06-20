@@ -1,11 +1,15 @@
 {
-  "name": "email-agent-api",
+  "name": "email-agent-system",
   "version": "1.0.0",
-  "description": "Serverless email agent API for business outreach",
+  "description": "Full-stack serverless email agent system with dashboard and API for business outreach",
   "main": "api/index.ts",
   "scripts": {
     "dev": "vercel dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:api": "vercel dev --listen 3001",
+    "build": "cd frontend && npm run build",
     "deploy": "vercel",
+    "install:all": "npm install && cd frontend && npm install",
     "test": "echo 'Tests to be implemented'"
   },
   "dependencies": {

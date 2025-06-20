@@ -1,18 +1,19 @@
 {
   "version": 2,
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/.next",
+  "installCommand": "npm install && cd frontend && npm install",
+  "devCommand": "cd frontend && npm run dev",
+  "framework": "nextjs",
   "functions": {
     "api/**/*.ts": {
       "runtime": "@vercel/node@3.2.17"
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/api/index"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     }
   ],
   "crons": [

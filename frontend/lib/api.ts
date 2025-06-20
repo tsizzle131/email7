@@ -2,7 +2,11 @@ class ApiClient {
   private baseURL: string
 
   constructor() {
-    this.baseURL = process.env.API_BASE_URL || 'http://localhost:3000'
+    // In production, use relative URLs (same domain)
+    // In development, use localhost
+    this.baseURL = process.env.NODE_ENV === 'production' 
+      ? '' 
+      : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000')
   }
 
   private async request(endpoint: string, options: RequestInit = {}) {
