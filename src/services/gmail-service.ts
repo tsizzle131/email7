@@ -604,10 +604,11 @@ export class GmailService {
       sent: data?.filter(t => t.sent_at).length || 0,
       responses: data?.filter(t => t.response_received).length || 0,
       pending: data?.filter(t => !t.sent_at).length || 0,
-      followUps: data?.reduce((sum, t) => sum + t.follow_up_count, 0) || 0
+      followUps: data?.reduce((sum, t) => sum + t.follow_up_count, 0) || 0,
+      responseRate: '0'
     };
 
-    stats['responseRate'] = stats.sent > 0 ? ((stats.responses / stats.sent) * 100).toFixed(1) : '0';
+    stats.responseRate = stats.sent > 0 ? ((stats.responses / stats.sent) * 100).toFixed(1) : '0';
 
     return stats;
   }

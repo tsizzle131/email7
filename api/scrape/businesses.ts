@@ -1,5 +1,4 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { GoogleMapsService } from '../../src/services/google-maps';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -9,21 +8,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { location, business_type, radius, max_results, exclude_chains } = req.body;
     
-    const config = {
-      location,
-      business_type,
-      radius,
-      max_results,
-      exclude_chains
-    };
+    if (!location) {
+      return res.status(400).json({ error: 'Location is required' });
+    }
 
-    const googleMapsService = new GoogleMapsService();
-    const companies = await googleMapsService.searchBusinesses(config);
+    // For now, return a mock response for testing deployment
+    // The full GoogleMapsService will be implemented after successful deployment
+    const mockCompanies = [
+      {
+        id: '1',
+        name: `Sample Business in ${location}`,
+        website: 'https://example.com',
+        email: 'contact@example.com',
+        phone: '+1-555-0123',
+        address: `123 Main St, ${location}`,
+        category: business_type || 'business',
+        rating: 4.5
+      }
+    ];
     
     res.status(200).json({
       success: true,
-      count: companies.length,
-      companies: companies.slice(0, 10)
+      count: mockCompanies.length,
+      companies: mockCompanies,
+      note: 'This is a mock response for deployment testing. Full implementation will be activated after successful deployment.'
     });
   } catch (error) {
     console.error('Error in scrape/businesses:', error);

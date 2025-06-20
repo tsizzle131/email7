@@ -132,7 +132,7 @@ export class WebsiteScraperService {
     }
   }
 
-  private extractEmails($: cheerio.CheerioAPI, website: string): string | null {
+  private extractEmails($: cheerio.Root, website: string): string | null {
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
     const emails = new Set<string>();
 
@@ -175,10 +175,10 @@ export class WebsiteScraperService {
     });
 
     // Also check the entire page text for emails
-    const pageText = $.text();
+    const pageText = $('body').text();
     const pageEmails = pageText.match(emailRegex);
     if (pageEmails) {
-      pageEmails.forEach(email => {
+      pageEmails.forEach((email: string) => {
         if (validator.isEmail(email)) {
           emails.add(email.toLowerCase());
         }
@@ -227,12 +227,12 @@ export class WebsiteScraperService {
     return filteredEmails.length > 0 ? filteredEmails[0] : null;
   }
 
-  private extractAdditionalData($: cheerio.CheerioAPI): any {
+  private extractAdditionalData($: cheerio.Root): any {
     const data: any = {};
 
     // Extract company size indicators
     const sizeIndicators = ['employees', 'team members', 'staff', 'people'];
-    const text = $.text().toLowerCase();
+    const text = $('body').text().toLowerCase();
     sizeIndicators.forEach(indicator => {
       const regex = new RegExp(`(\\d+)\\+?\\s*${indicator}`, 'i');
       const match = text.match(regex);
@@ -278,7 +278,7 @@ export class WebsiteScraperService {
     return data;
   }
 
-  private getCleanTextContent($: cheerio.CheerioAPI): string {
+  private getCleanTextContent($: cheerio.Root): string {
     // Remove script and style elements
     $('script, style, noscript').remove();
     
