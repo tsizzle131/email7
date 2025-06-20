@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "buildCommand": "echo 'No build needed for serverless functions'",
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@3.2.17"
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/follow-ups",
