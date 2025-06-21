@@ -112,13 +112,17 @@ export interface ScrapingConfig {
 }
 
 export interface ScrapingResult {
-  scraped: number;
-  emailsExtracted: number;
-  companies: Company[];
-  errors: string[];
-  fromCache: number;
-  processing_time: number;
+  success: boolean;
+  location: string;
+  business_type: string;
   source: string;
+  results: {
+    scraped: number;
+    emailsExtracted: number;
+    companies: Company[];
+    errors: string[];
+    fromCache: number;
+  };
 }
 
 export interface EmailExtractionResult {

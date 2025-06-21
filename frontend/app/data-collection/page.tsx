@@ -25,9 +25,9 @@ export default function DataCollection() {
 
     setLoading({ ...loading, scraping: true })
     try {
-      const response = await apiClient.post('/api/scrape/businesses', scrapingConfig)
-      setResults(response.data)
-      alert(`Successfully scraped ${response.data.count} businesses`)
+      const response = await apiClient.scrapeBusinesses(scrapingConfig)
+      setResults(response)
+      alert(`Successfully scraped ${response.results?.scraped || 0} businesses`)
     } catch (error) {
       alert('Error scraping businesses')
     } finally {

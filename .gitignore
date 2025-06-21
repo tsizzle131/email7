@@ -33,3 +33,4 @@ package-vercel.json
 *.config.ts
 REAL_DATA_STATUS.md
 SCRAPINGBEE_TESTING.md 
+.vercel

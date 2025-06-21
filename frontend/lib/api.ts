@@ -125,7 +125,7 @@ class ApiClient {
     use_scrapingbee?: boolean
     skip_existing?: boolean
   } = {}): Promise<{ results: EmailExtractionResult; summary: any }> {
-    return this.post('/api/scrape/emails', data)
+    return this.post('/api/scrape/businesses?action=extract-emails', data)
   }
 
   // ============================================================
