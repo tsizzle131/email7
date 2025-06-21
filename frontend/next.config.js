@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // For static export to work with Vercel
-  output: 'export',
-  trailingSlash: true,
+  // Remove static export for proper Vercel deployment with API routes
   images: {
     unoptimized: true
   }

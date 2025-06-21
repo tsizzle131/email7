@@ -2,7 +2,7 @@
   "name": "email-agent-system",
   "version": 2,
   "buildCommand": "cd frontend && npm ci && npm run build",
-  "outputDirectory": "frontend/out",
+  "outputDirectory": "frontend/.next",
   "installCommand": "npm ci && cd frontend && npm ci",
   "functions": {
     "api/**/*.ts": {
