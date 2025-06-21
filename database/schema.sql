@@ -2,6 +2,21 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "vector";
 
+-- Business caching table for optimization
+CREATE TABLE business_cache (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    business_key TEXT UNIQUE NOT NULL, -- hash of name+location for deduplication
+    cached_data JSONB NOT NULL,
+    cache_type VARCHAR(50) DEFAULT 'business_data', -- business_data, email_extraction, etc.
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for fast cache lookups
+CREATE INDEX idx_business_cache_key ON business_cache(business_key);
+CREATE INDEX idx_business_cache_expires ON business_cache(expires_at);
+CREATE INDEX idx_business_cache_type ON business_cache(cache_type);
+
 -- Companies table
 CREATE TABLE companies (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

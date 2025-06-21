@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import validator from 'validator';
+import crypto from 'crypto';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -29,20 +30,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Step 1: Search for businesses using ScrapingBee to scrape business directories
-    const businesses = await scrapeBusinessDirectory(location, business_type, source, max_results);
+    // Step 1: Check cache for directory search first
+    const directoryKey = generateCacheKey(`directory_${location}_${business_type}_${source}`);
+    let businesses = await getCachedData(directoryKey, 'business_data');
+    
+    if (!businesses) {
+      // Cache miss - scrape business directory
+      businesses = await scrapeBusinessDirectory(location, business_type, source, max_results);
+      
+      // Cache directory results for 7 days
+      await setCachedData(directoryKey, businesses, 'business_data', 7);
+    }
 
     const results = {
       scraped: 0,
       emailsExtracted: 0,
       companies: [] as any[],
-      errors: [] as string[]
+      errors: [] as string[],
+      fromCache: 0
     };
 
-    // Step 2: Process each business from directory
-    for (const business of businesses) {
+    // Step 2: Process businesses in batches with duplicate detection
+    const processedBusinesses = await deduplicateBusinesses(businesses);
+    
+    for (const business of processedBusinesses) {
       try {
         if (!business.name) {
+          continue;
+        }
+
+        // Check for cached business data first
+        const cachedBusiness = await checkBusinessDuplicate(business.name, location);
+        
+        if (cachedBusiness) {
+          results.companies.push(cachedBusiness);
+          results.scraped++;
+          results.fromCache++;
+          if (cachedBusiness.email) {
+            results.emailsExtracted++;
+          }
           continue;
         }
 
@@ -72,32 +98,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           results.emailsExtracted++;
         }
 
-        // Step 4: Save to database
-        const { data: savedCompany, error } = await supabase
-          .from('companies')
-          .upsert({
-            name: company.name,
-            website: company.website,
-            email: company.email,
-            phone: company.phone,
-            address: company.address,
-            category: company.category,
-            rating: company.rating,
-            scraped_content: company.scraped_content,
-            scraped_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (!error) {
+        // Step 4: Save to database with retry logic
+        const savedCompany = await saveCompanyWithRetry(company);
+        
+        if (savedCompany) {
           results.companies.push(savedCompany);
           results.scraped++;
+          
+          // Cache the successful result
+          await cacheBusinessData(business.name, location, savedCompany);
         } else {
-          results.errors.push(`Failed to save ${company.name}: ${error.message}`);
+          results.errors.push(`Failed to save ${company.name}`);
         }
 
-        // Small delay to respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Adaptive delay based on success rate
+        const delayMs = results.errors.length > results.scraped * 0.2 ? 1000 : 300;
+        await new Promise(resolve => setTimeout(resolve, delayMs));
 
       } catch (businessError) {
         results.errors.push(`Error processing ${business.name}: ${businessError}`);
@@ -305,18 +321,168 @@ function extractWebsiteFromYelpRedirect(redirectUrl: string): string | null {
 
 async function extractEmailFromWebsite(website: string): Promise<{ email: string | null; content: string }> {
   try {
-    // Always use ScrapingBee for email extraction since we're ScrapingBee-only now
-    return await extractWithScrapingBee(website);
+    // Check cache first
+    const cacheKey = generateCacheKey(`email_${website}`);
+    const cachedResult = await getCachedData(cacheKey, 'email_extraction');
+    if (cachedResult) {
+      return cachedResult;
+    }
+
+    // Enhanced multi-page email extraction
+    const result = await extractEmailsMultiPage(website);
+    
+    // Cache the result for 30 days
+    await setCachedData(cacheKey, result, 'email_extraction', 30);
+    
+    return result;
   } catch (error) {
     console.warn(`Email extraction failed for ${website}:`, error);
-    // Fallback to direct scraping if ScrapingBee fails
+    return { email: null, content: '' };
+  }
+}
+
+async function extractEmailsMultiPage(website: string): Promise<{ email: string | null; content: string }> {
+  const emails: Set<string> = new Set();
+  let allContent = '';
+  
+  // List of pages to check for emails
+  const pagesToCheck = [
+    '', // Homepage
+    '/contact',
+    '/contact-us',
+    '/get-in-touch',
+    '/about',
+    '/about-us',
+    '/team',
+    '/staff',
+    '/leadership'
+  ];
+
+  // Extract emails from multiple pages
+  for (const page of pagesToCheck) {
     try {
-      return await extractWithDirectScraping(website);
-    } catch (fallbackError) {
-      console.warn(`Direct scraping also failed for ${website}:`, fallbackError);
-      return { email: null, content: '' };
+      const fullUrl = website.replace(/\/$/, '') + page;
+      const pageResult = await extractWithScrapingBee(fullUrl);
+      
+      if (pageResult.email) {
+        emails.add(pageResult.email);
+      }
+      
+      // Extract additional emails from page content
+      const pageEmails = extractAllEmailsFromContent(pageResult.content);
+      pageEmails.forEach(email => emails.add(email));
+      
+      allContent += pageResult.content + ' ';
+      
+      // Small delay between page requests
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+    } catch (pageError) {
+      console.warn(`Failed to extract from ${website}${page}:`, pageError);
+      continue;
     }
   }
+
+  // Also try to extract from social media profiles
+  try {
+    const socialEmails = await extractSocialMediaEmails(website, allContent);
+    socialEmails.forEach(email => emails.add(email));
+  } catch (socialError) {
+    console.warn(`Social media extraction failed for ${website}:`, socialError);
+  }
+
+  // Prioritize emails by quality
+  const emailArray = Array.from(emails);
+  const bestEmail = prioritizeEmails(emailArray);
+  
+  return {
+    email: bestEmail,
+    content: allContent.substring(0, 5000) // Limit content size
+  };
+}
+
+function extractAllEmailsFromContent(content: string): string[] {
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  const matches = content.match(emailRegex) || [];
+  
+  return matches
+    .filter(email => validator.isEmail(email))
+    .filter(email => {
+      // Filter out unwanted emails
+      const unwanted = ['example@', 'test@', 'noreply@', 'no-reply@', 'donotreply@'];
+      return !unwanted.some(pattern => email.toLowerCase().includes(pattern));
+    })
+    .map(email => email.toLowerCase());
+}
+
+function prioritizeEmails(emails: string[]): string | null {
+  if (emails.length === 0) return null;
+  
+  // Priority order for email types
+  const priorities = [
+    'contact@',
+    'info@',
+    'hello@',
+    'sales@',
+    'support@',
+    'admin@',
+    'office@'
+  ];
+  
+  // Find highest priority email
+  for (const priority of priorities) {
+    const found = emails.find(email => email.includes(priority));
+    if (found) return found;
+  }
+  
+  // Return first email if no priority match
+  return emails[0];
+}
+
+async function extractSocialMediaEmails(website: string, content: string): Promise<string[]> {
+  const emails: string[] = [];
+  
+  try {
+    // Extract social media URLs from content
+    const socialUrls = extractSocialMediaUrls(content);
+    
+    for (const socialUrl of socialUrls.slice(0, 3)) { // Limit to 3 social profiles
+      try {
+        const socialResult = await extractWithScrapingBee(socialUrl);
+        const socialEmails = extractAllEmailsFromContent(socialResult.content);
+        emails.push(...socialEmails);
+        
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch (socialError) {
+        console.warn(`Failed to extract from social URL ${socialUrl}:`, socialError);
+      }
+    }
+  } catch (error) {
+    console.warn(`Social media email extraction failed:`, error);
+  }
+  
+  return emails;
+}
+
+function extractSocialMediaUrls(content: string): string[] {
+  const socialUrls: string[] = [];
+  
+  // LinkedIn URLs
+  const linkedinRegex = /https?:\/\/(www\.)?linkedin\.com\/company\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+/g;
+  const linkedinMatches = content.match(linkedinRegex) || [];
+  socialUrls.push(...linkedinMatches);
+  
+  // Facebook URLs
+  const facebookRegex = /https?:\/\/(www\.)?facebook\.com\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+/g;
+  const facebookMatches = content.match(facebookRegex) || [];
+  socialUrls.push(...facebookMatches);
+  
+  // Twitter URLs
+  const twitterRegex = /https?:\/\/(www\.)?(twitter\.com|x\.com)\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+/g;
+  const twitterMatches = content.match(twitterRegex) || [];
+  socialUrls.push(...twitterMatches);
+  
+  return socialUrls.slice(0, 5); // Limit to 5 URLs
 }
 
 async function extractWithScrapingBee(website: string): Promise<{ email: string | null; content: string }> {
@@ -424,4 +590,140 @@ function getCleanTextContent($: cheerio.CheerioAPI): string {
     .replace(/\s+/g, ' ')
     .trim()
     .substring(0, 3000);
+}
+
+// Caching utility functions
+function generateCacheKey(input: string): string {
+  return crypto.createHash('sha256').update(input).digest('hex');
+}
+
+async function getCachedData(cacheKey: string, cacheType: string): Promise<any | null> {
+  try {
+    const { data, error } = await supabase
+      .from('business_cache')
+      .select('cached_data, expires_at')
+      .eq('business_key', cacheKey)
+      .eq('cache_type', cacheType)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    // Check if cache has expired
+    const now = new Date();
+    const expiresAt = new Date(data.expires_at);
+    
+    if (now > expiresAt) {
+      // Cache expired, delete it
+      await supabase
+        .from('business_cache')
+        .delete()
+        .eq('business_key', cacheKey)
+        .eq('cache_type', cacheType);
+      
+      return null;
+    }
+
+    return data.cached_data;
+  } catch (error) {
+    console.warn('Cache read error:', error);
+    return null;
+  }
+}
+
+async function setCachedData(cacheKey: string, data: any, cacheType: string, daysToExpire: number): Promise<void> {
+  try {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + daysToExpire);
+
+    await supabase
+      .from('business_cache')
+      .upsert({
+        business_key: cacheKey,
+        cached_data: data,
+        cache_type: cacheType,
+        expires_at: expiresAt.toISOString()
+      });
+  } catch (error) {
+    console.warn('Cache write error:', error);
+    // Don't throw - caching is optional
+  }
+}
+
+async function checkBusinessDuplicate(name: string, location: string): Promise<any | null> {
+  const duplicateKey = generateCacheKey(`business_${name}_${location}`.toLowerCase());
+  return await getCachedData(duplicateKey, 'business_data');
+}
+
+async function cacheBusinessData(name: string, location: string, businessData: any): Promise<void> {
+  const duplicateKey = generateCacheKey(`business_${name}_${location}`.toLowerCase());
+  await setCachedData(duplicateKey, businessData, 'business_data', 30);
+}
+
+async function deduplicateBusinesses(businesses: any[]): Promise<any[]> {
+  const seen = new Set<string>();
+  const deduplicated = [];
+  
+  for (const business of businesses) {
+    if (!business.name) continue;
+    
+    // Create a normalized key for duplicate detection
+    const normalizedName = business.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const duplicateKey = `${normalizedName}_${business.website || ''}`;
+    
+    if (!seen.has(duplicateKey)) {
+      seen.add(duplicateKey);
+      deduplicated.push(business);
+    }
+  }
+  
+  return deduplicated;
+}
+
+async function saveCompanyWithRetry(company: any, maxRetries: number = 3): Promise<any | null> {
+  let lastError: any = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const { data: savedCompany, error } = await supabase
+        .from('companies')
+        .upsert({
+          name: company.name,
+          website: company.website,
+          email: company.email,
+          phone: company.phone,
+          address: company.address,
+          category: company.category,
+          rating: company.rating,
+          scraped_content: company.scraped_content,
+          scraped_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (!error) {
+        return savedCompany;
+      }
+      
+      lastError = error;
+      
+      // Exponential backoff: wait longer between retries
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+    } catch (saveError) {
+      lastError = saveError;
+      
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  console.error(`Failed to save ${company.name} after ${maxRetries} attempts:`, lastError);
+  return null;
 }
