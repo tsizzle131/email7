@@ -38,11 +38,16 @@ export default function DataCollection() {
   const handleExtractEmails = async () => {
     setLoading({ ...loading, emails: true })
     try {
-      const response = await apiClient.post('/api/scrape/emails')
-      setResults(response.data)
-      alert('Email extraction completed')
+      const response = await apiClient.extractEmails({
+        batch_size: 20,
+        skip_existing: true,
+        use_scrapingbee: true
+      })
+      setResults(response)
+      alert(`Email extraction completed. Found ${response.results.emailsFound} emails from ${response.results.processed} companies.`)
     } catch (error) {
-      alert('Error extracting emails')
+      console.error('Email extraction error:', error)
+      alert('Error extracting emails: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setLoading({ ...loading, emails: false })
     }

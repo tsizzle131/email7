@@ -18,11 +18,11 @@ import { clsx } from 'clsx'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
+  { name: 'Companies', href: '/companies', icon: Users },
   { name: 'Data Collection', href: '/data-collection', icon: Database },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
-  { name: 'Conversations', href: '/conversations', icon: MessageSquare },
-  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 

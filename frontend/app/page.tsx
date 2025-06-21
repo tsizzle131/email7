@@ -1,63 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { StatsCard } from '@/components/StatsCard'
 import { Chart } from '@/components/Chart'
 import { RecentActivity } from '@/components/RecentActivity'
 import { apiClient } from '@/lib/api'
-import { Activity, BarChart3, Mail, Users, Database, TrendingUp } from 'lucide-react'
-
-interface OverviewStats {
-  scraping: {
-    total: number
-    today: number
-    thisWeek: number
-    lastScraped: number | null
-  }
-  emails: {
-    totalCompanies: number
-    companiesWithEmails: number
-    extractionRate: string
-    pendingExtraction: number
-  }
-  enrichment: {
-    eligible: number
-    enriched: number
-    pending: number
-    enrichmentRate: string
-    costTracker: {
-      totalTokensUsed: number
-      totalCost: number
-      requestCount: number
-    }
-  }
-  knowledgeBase: {
-    total: number
-    byType: Record<string, number>
-    recentlyAdded: number
-  }
-}
+import { OverviewStats } from '@/lib/types'
+import { Activity, BarChart3, Mail, Users, Database, TrendingUp, RefreshCw } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<OverviewStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => apiClient.getDashboardStats(),
+    refetchInterval: 60000, // Auto-refresh every minute
+  })
 
-  useEffect(() => {
-    fetchStats()
-  }, [])
+  const stats = data?.stats
 
-  const fetchStats = async () => {
-    try {
-      const response = await apiClient.get('/api/stats/overview')
-      setStats(response.data.stats)
-    } catch (error) {
-      console.error('Error fetching stats:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         {/* Loading header */}
@@ -108,10 +68,10 @@ export default function Dashboard() {
             Unable to connect to the API. Please check your connection and try again.
           </p>
           <button 
-            onClick={fetchStats}
+            onClick={() => refetch()}
             className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
           >
-            <Activity className="h-4 w-4 mr-2" />
+            <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </button>
         </div>
