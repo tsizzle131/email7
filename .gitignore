@@ -23,4 +23,13 @@ dist/
 # Vercel
 .vercel/
 .vercelignore
-package-vercel.json 
+package-vercel.json
+
+# Testing
+/tests/
+/test-*.js
+/test-*.ts
+*.config.js
+*.config.ts
+REAL_DATA_STATUS.md
+SCRAPINGBEE_TESTING.md 

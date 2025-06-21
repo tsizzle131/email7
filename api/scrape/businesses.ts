@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       business_type = '', 
       max_results = 20,
       extract_emails = true,
-      source = 'yelp' // yelp, yellowpages, google, linkedin
+      source = 'google' // google, yelp, yellowpages, linkedin
     } = req.body;
 
     if (!location) {
@@ -147,31 +147,38 @@ async function scrapeBusinessDirectory(location: string, businessType: string, s
 
     // Build search URL based on source
     switch (source.toLowerCase()) {
+      case 'google':
+        searchUrl = `https://www.google.com/maps/search/${encodedBusinessType}+${encodedLocation}`;
+        break;
       case 'yelp':
         searchUrl = `https://www.yelp.com/search?find_desc=${encodedBusinessType}&find_loc=${encodedLocation}`;
         break;
       case 'yellowpages':
         searchUrl = `https://www.yellowpages.com/search?search_terms=${encodedBusinessType}&geo_location_terms=${encodedLocation}`;
         break;
-      case 'google':
-        searchUrl = `https://www.google.com/search?q=${encodedBusinessType}+${encodedLocation}+business+directory`;
-        break;
       case 'linkedin':
         searchUrl = `https://www.linkedin.com/search/results/companies/?keywords=${encodedBusinessType}&origin=GLOBAL_SEARCH_HEADER&sid=123`;
         break;
       default:
-        searchUrl = `https://www.yelp.com/search?find_desc=${encodedBusinessType}&find_loc=${encodedLocation}`;
+        searchUrl = `https://www.google.com/maps/search/${encodedBusinessType}+${encodedLocation}`;
     }
 
     // Use ScrapingBee to scrape the directory
+    const scrapingParams: any = {
+      api_key: process.env.SCRAPINGBEE_API_KEY,
+      url: searchUrl,
+      render_js: 'true', // Enable JS rendering for dynamic content
+      premium_proxy: 'true', // Use premium proxies for better success rate
+      country_code: 'us'
+    };
+
+    // Add Google-specific parameters when scraping Google
+    if (source.toLowerCase() === 'google' && searchUrl.includes('google.com')) {
+      scrapingParams.custom_google = 'true'; // Required for Google scraping (costs 20 credits)
+    }
+
     const response = await axios.get('https://app.scrapingbee.com/api/v1/', {
-      params: {
-        api_key: process.env.SCRAPINGBEE_API_KEY,
-        url: searchUrl,
-        render_js: 'true', // Enable JS rendering for dynamic content
-        premium_proxy: 'true', // Use premium proxies for better success rate
-        country_code: 'us'
-      },
+      params: scrapingParams,
       timeout: 30000
     });
 
@@ -179,14 +186,14 @@ async function scrapeBusinessDirectory(location: string, businessType: string, s
     
     // Parse businesses based on source
     switch (source.toLowerCase()) {
+      case 'google':
+        businesses.push(...parseGoogleMapsResults($, maxResults));
+        break;
       case 'yelp':
         businesses.push(...parseYelpResults($, maxResults));
         break;
       case 'yellowpages':
         businesses.push(...parseYellowPagesResults($, maxResults));
-        break;
-      case 'google':
-        businesses.push(...parseGoogleResults($, maxResults));
         break;
       case 'linkedin':
         businesses.push(...parseLinkedInResults($, maxResults));
@@ -258,30 +265,124 @@ function parseYellowPagesResults($: cheerio.CheerioAPI, maxResults: number) {
   return businesses;
 }
 
-function parseGoogleResults($: cheerio.CheerioAPI, maxResults: number) {
+function parseGoogleMapsResults($: cheerio.CheerioAPI, maxResults: number) {
   const businesses = [];
   
-  $('.g').each((index, element) => {
-    if (index >= maxResults) return false;
-    
-    const $result = $(element);
-    const name = $result.find('h3').text().trim();
-    const link = $result.find('a').attr('href');
-    
-    if (name && link && !link.includes('google.com')) {
-      businesses.push({
-        name,
-        address: null,
-        phone: null,
-        rating: null,
-        website: link,
-        category: null,
-        email: null
-      });
-    }
-  });
+  // Google Maps business cards have specific selectors
+  const businessSelectors = [
+    '[data-result-index]', // Main business card container
+    '.hfpxzc', // Business listing container
+    '[jsaction*="pane.resultList.business"]', // Business result item
+    '.Nv2PK', // Alternative business card
+    '[data-cid]' // Business with CID
+  ];
   
-  return businesses;
+  for (const selector of businessSelectors) {
+    $(selector).each((index, element) => {
+      if (businesses.length >= maxResults) return false;
+      
+      const $business = $(element);
+      
+      // Extract business name
+      const name = $business.find('.qBF1Pd').text().trim() || 
+                   $business.find('.fontHeadlineSmall').text().trim() ||
+                   $business.find('h3').text().trim() ||
+                   $business.find('[data-value="Name"]').next().text().trim();
+      
+      if (!name) return true; // Skip if no name found
+      
+      // Extract address
+      const address = $business.find('.W4Efsd:last').text().trim() ||
+                     $business.find('[data-value="Address"]').next().text().trim() ||
+                     $business.find('.rogA2c .fontBodyMedium').text().trim();
+      
+      // Extract phone number
+      const phone = $business.find('[data-value="Phone"]').next().text().trim() ||
+                   $business.find('span[aria-label*="phone"]').text().trim() ||
+                   $business.find('.rogA2c .fontBodyMedium').filter((i, el) => {
+                     return /[\d\(\)\-\+\s]{10,}/.test($(el).text());
+                   }).first().text().trim();
+      
+      // Extract rating
+      let rating = null;
+      const ratingText = $business.find('.MW4etd').text().trim() ||
+                        $business.find('.fontDisplayMedium').text().trim() ||
+                        $business.find('[data-value="Rating"]').next().text().trim();
+      
+      if (ratingText) {
+        const ratingMatch = ratingText.match(/(\d+\.?\d*)/);
+        if (ratingMatch) {
+          rating = parseFloat(ratingMatch[1]);
+        }
+      }
+      
+      // Extract website
+      let website = null;
+      const websiteElement = $business.find('a[data-value="Website"]').attr('href') ||
+                            $business.find('a[href*="http"]:not([href*="google.com"])').attr('href') ||
+                            $business.find('[data-value="Website"]').next().find('a').attr('href');
+      
+      if (websiteElement) {
+        // Clean up Google redirect URLs
+        try {
+          const url = new URL(websiteElement);
+          if (url.hostname === 'www.google.com' && url.searchParams.has('url')) {
+            website = url.searchParams.get('url');
+          } else if (!websiteElement.includes('google.com')) {
+            website = websiteElement;
+          }
+        } catch {
+          website = websiteElement.includes('google.com') ? null : websiteElement;
+        }
+      }
+      
+      // Extract category/business type
+      const category = $business.find('.W4Efsd:first').text().trim() ||
+                      $business.find('[data-value="Category"]').next().text().trim() ||
+                      $business.find('.fontBodyMedium').first().text().trim();
+      
+      // Only add if we have a valid business name
+      if (name && name.length > 2) {
+        businesses.push({
+          name,
+          address: address || null,
+          phone: phone || null,
+          rating: rating,
+          website: website,
+          category: category || null,
+          email: null
+        });
+      }
+    });
+    
+    // If we found businesses with this selector, break
+    if (businesses.length > 0) break;
+  }
+  
+  // Fallback: try to parse standard Google search results if Maps parsing failed
+  if (businesses.length === 0) {
+    $('.g').each((index, element) => {
+      if (index >= maxResults) return false;
+      
+      const $result = $(element);
+      const name = $result.find('h3').text().trim();
+      const link = $result.find('a').attr('href');
+      
+      if (name && link && !link.includes('google.com') && name.length > 2) {
+        businesses.push({
+          name,
+          address: null,
+          phone: null,
+          rating: null,
+          website: link,
+          category: null,
+          email: null
+        });
+      }
+    });
+  }
+  
+  return businesses.slice(0, maxResults);
 }
 
 function parseLinkedInResults($: cheerio.CheerioAPI, maxResults: number) {

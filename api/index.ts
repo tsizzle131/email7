@@ -40,7 +40,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       ]
     },
     features: [
-      '✅ Multi-Source Business Discovery (Yelp, Yellow Pages, Google, LinkedIn)',
+      '✅ Multi-Source Business Discovery (Google Maps, Yelp, Yellow Pages, LinkedIn)',
       '✅ Enhanced Multi-Page Email Extraction (90% success rate)',
       '✅ Social Media Profile Email Discovery',
       '✅ Intelligent Caching System (30-day TTL)',
