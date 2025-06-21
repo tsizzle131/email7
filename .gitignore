@@ -29,6 +29,10 @@ package-vercel.json
 /tests/
 /test-*.js
 /test-*.ts
+# Allow specific config files
+!postcss.config.js
+!tailwind.config.js
+!next.config.js
 *.config.js
 *.config.ts
 REAL_DATA_STATUS.md
