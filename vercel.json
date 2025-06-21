@@ -10,16 +10,8 @@
   },
   "crons": [
     {
-      "path": "/api/cron/follow-ups",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/process-campaigns",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-cache",
-      "schedule": "0 3 * * *"
+      "path": "/api/cron/master-scheduler",
+      "schedule": "0 2,3,6,9 * * *"
     }
   ]
 }

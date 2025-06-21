@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import validator from 'validator';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -208,8 +208,8 @@ async function scrapeBusinessDirectory(location: string, businessType: string, s
   return businesses.slice(0, maxResults);
 }
 
-function parseYelpResults($: cheerio.CheerioAPI, maxResults: number) {
-  const businesses = [];
+function parseYelpResults($: cheerio.Root, maxResults: number) {
+  const businesses: any[] = [];
   
   $('[data-testid="serp-ia-card"]').each((index, element) => {
     if (index >= maxResults) return false;
@@ -237,8 +237,8 @@ function parseYelpResults($: cheerio.CheerioAPI, maxResults: number) {
   return businesses;
 }
 
-function parseYellowPagesResults($: cheerio.CheerioAPI, maxResults: number) {
-  const businesses = [];
+function parseYellowPagesResults($: cheerio.Root, maxResults: number) {
+  const businesses: any[] = [];
   
   $('.result').each((index, element) => {
     if (index >= maxResults) return false;
@@ -265,8 +265,8 @@ function parseYellowPagesResults($: cheerio.CheerioAPI, maxResults: number) {
   return businesses;
 }
 
-function parseGoogleMapsResults($: cheerio.CheerioAPI, maxResults: number) {
-  const businesses = [];
+function parseGoogleMapsResults($: cheerio.Root, maxResults: number) {
+  const businesses: any[] = [];
   
   // Google Maps business cards have specific selectors
   const businessSelectors = [
@@ -385,8 +385,8 @@ function parseGoogleMapsResults($: cheerio.CheerioAPI, maxResults: number) {
   return businesses.slice(0, maxResults);
 }
 
-function parseLinkedInResults($: cheerio.CheerioAPI, maxResults: number) {
-  const businesses = [];
+function parseLinkedInResults($: cheerio.Root, maxResults: number) {
+  const businesses: any[] = [];
   
   $('.entity-result').each((index, element) => {
     if (index >= maxResults) return false;
@@ -620,7 +620,7 @@ async function extractWithDirectScraping(website: string): Promise<{ email: stri
   return { email, content };
 }
 
-function extractEmailsFromHTML($: cheerio.CheerioAPI): string | null {
+function extractEmailsFromHTML($: cheerio.Root): string | null {
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const emails = new Set<string>();
 
@@ -671,7 +671,7 @@ function extractEmailsFromHTML($: cheerio.CheerioAPI): string | null {
          (filteredEmails.length > 0 ? filteredEmails[0] : null);
 }
 
-function getCleanTextContent($: cheerio.CheerioAPI): string {
+function getCleanTextContent($: cheerio.Root): string {
   // Remove unwanted elements
   $('script, style, noscript').remove();
   
