@@ -9,13 +9,7 @@
     "dev:api": "vercel dev --listen 3001",
     "build": "cd frontend && npm run build",
     "deploy": "vercel",
-    "install:all": "npm install && cd frontend && npm install",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:e2e": "playwright test",
-    "test:unit": "jest --testPathPattern=unit",
-    "test:integration": "jest --testPathPattern=integration"
+    "install:all": "npm install && cd frontend && npm install"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -30,15 +24,8 @@
   "devDependencies": {
     "@types/node": "^20.16.10",
     "@types/validator": "^13.12.2",
-    "@types/jest": "^29.5.12",
     "@types/cheerio": "^0.22.35",
-    "typescript": "^5.6.3",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.2",
-    "@playwright/test": "^1.42.1",
-    "jest-environment-node": "^29.7.0",
-    "supertest": "^6.3.4",
-    "@types/supertest": "^6.0.2"
+    "typescript": "^5.6.3"
   },
   "engines": {
     "node": ">=20.0.0"
